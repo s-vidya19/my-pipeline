@@ -1,0 +1,51 @@
+pipeline {
+    agent any
+    tools {
+        maven 'maven'
+    }
+    environment {
+    registry = "srividya271/css-software"
+    registryCredential = 'dockerhub'
+    dockerImage = ''
+  }    
+    stages {
+        stage ('git clone') {
+            steps {
+                checkout scmGit(branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[credentialsId: 'github', url: 'https://github.com/Cvaaaa/maven-web-app.git']])
+            }
+        }
+        stage ('build') {
+            steps {
+                sh 'mvn clean test package'
+            }
+        }
+        stage ('tomcat') {
+            steps {
+                deploy adapters: [tomcat9(credentialsId: 'tomcat', path: '', url: 'http://43.205.206.161:8080/')], contextPath: 'maven-web-app.war', war: '**/*.war'
+            }
+        }
+        stage ('building Image') {
+            steps {
+                script {
+                    dockerImage = docker.build registry + ":$BUILD_NUMBER"
+                }
+            }
+        }
+        stage('Deploy Image') {
+      steps{
+         script {
+            docker.withRegistry( '', registryCredential ) {
+            dockerImage.push()
+            }    
+          }
+        }
+      }
+    stage('Remove Unused docker image') {
+      steps{
+        sh "docker rmi $registry:$BUILD_NUMBER"
+        sh "docker run -d --name Programit19 -p 8087:8080 srividya271/css-software:$BUILD_NUMBER"
+        
+      }
+    }   
+    }
+}
